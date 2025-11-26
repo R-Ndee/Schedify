@@ -1,0 +1,16 @@
+# ✅ REDUCED memory allocation (dari 8G ke 4G)
+org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+
+# ✅ TAMBAHKAN optimization settings
+org.gradle.parallel=true
+org.gradle.caching=true
+org.gradle.daemon=true
+org.gradle.configureondemand=true
+org.gradle.workers.max=4
+
+# Android settings
+android.useAndroidX=true
+android.enableJetifier=true
+
+# ✅ TAMBAHKAN Kotlin daemon memory
+kotlin.daemon.jvmargs=-Xmx1536m
