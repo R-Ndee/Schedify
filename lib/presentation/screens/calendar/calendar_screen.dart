@@ -57,6 +57,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     }).toList();
   }
 
+  
+
+  
+
   @override
   Widget build(BuildContext context) {
     final eventsAsync = ref.watch(eventListProvider);
@@ -67,132 +71,58 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         centerTitle: true,
         elevation: 0,
         actions: [
+          // Keep only the bell (test notification) and refresh actions per request
           IconButton(
             onPressed: () async {
-              print('========== NOTIFICATION DEBUG ==========');
+              developer.log('========== NOTIFICATION DEBUG ==========',
+                  name: 'CalendarScreen');
 
-              // 1. Check notification service
               try {
-                final notificationService =
-                    ref.read(notificationServiceProvider);
-                print('✅ Notification service accessible');
+                final notificationService = ref.read(notificationServiceProvider);
+                developer.log('✅ Notification service accessible', name: 'CalendarScreen');
 
-                // 2. Check permission
                 final hasPermission = await notificationService.hasPermission();
-                print(
-                    'Permission status: ${hasPermission ? "✅ GRANTED" : "❌ DENIED"}');
+                developer.log('Permission status: ${hasPermission ? "✅ GRANTED" : "❌ DENIED"}', name: 'CalendarScreen');
 
                 if (!hasPermission) {
-                  print('Requesting permission...');
                   final granted = await notificationService.requestPermission();
-                  print(
-                      'Permission request result: ${granted ? "✅ GRANTED" : "❌ DENIED"}');
+                  developer.log('Permission request result: ${granted ? "✅ GRANTED" : "❌ DENIED"}', name: 'CalendarScreen');
                 }
 
-                // 3. Get pending notifications
-                final pending =
-                    await notificationService.getPendingNotifications();
-                print('Pending notifications: ${pending.length}');
-                for (var notification in pending) {
-                  print('  - ID: ${notification.id}');
-                  print('    Title: ${notification.title}');
-                  print('    Body: ${notification.body}');
-                }
-
-                // 4. Test immediate notification
-                print('Sending test notification...');
+                // Send immediate test notification
                 await notificationService.showImmediateNotification(
                   title: '🔔 Test Notification',
                   body: 'If you see this, notifications are working!',
                 );
-                print('✅ Test notification sent');
-
-                // 5. Check events with reminders
-                final eventsAsync = ref.read(eventListProvider);
-                eventsAsync.whenData((events) {
-                  final eventsWithReminder =
-                      events.where((e) => e.hasReminder).toList();
-                  print('Events with reminder: ${eventsWithReminder.length}');
-                  for (var event in eventsWithReminder) {
-                    print('  - ${event.title}');
-                    print('    Reminder: ${event.reminderText}');
-                    print('    Reminder time: ${event.reminderTime}');
-                    print('    Start time: ${event.startTime}');
-                  }
-                });
+                developer.log('✅ Test notification sent', name: 'CalendarScreen');
               } catch (e, stackTrace) {
-                print('❌ ERROR: $e');
-                print('StackTrace: $stackTrace');
+                developer.log('❌ ERROR: $e', name: 'CalendarScreen');
+                developer.log('StackTrace: $stackTrace', name: 'CalendarScreen');
               }
 
-              print('========================================');
-
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Check console for debug info'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Check console for debug info'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
             },
             icon: const Icon(Icons.notifications_active),
             tooltip: 'Debug Notifications',
           ),
-          // Debug button - Remove in production
-          IconButton(
-            onPressed: () async {
-              final repository = ref.read(eventRepositoryProvider);
-              await repository.debugPrintAllEvents();
 
-              developer.log('========== CURRENT STATE ==========',
-                  name: 'CalendarScreen');
-              developer.log('Selected date: $_selectedDay',
-                  name: 'CalendarScreen');
-              developer.log('Focused date: $_focusedDay',
-                  name: 'CalendarScreen');
-              developer.log('Calendar format: $_calendarFormat',
-                  name: 'CalendarScreen');
-
-              eventsAsync.whenData((events) {
-                developer.log('Total events in state: ${events.length}',
-                    name: 'CalendarScreen');
-                final todayEvents = _getEventsForDay(events, _selectedDay);
-                developer.log('Events for selected day: ${todayEvents.length}',
-                    name: 'CalendarScreen');
-                for (var event in todayEvents) {
-                  developer.log('  - ${event.title} at ${event.date}',
-                      name: 'CalendarScreen');
-                }
-              });
-              developer.log('===================================',
-                  name: 'CalendarScreen');
-
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Check console for debug info'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
-            },
-            icon: const Icon(Icons.bug_report),
-            tooltip: 'Debug Info',
-          ),
-          // Refresh button
           IconButton(
             onPressed: () async {
               await ref.read(eventListProvider.notifier).refresh();
 
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Events refreshed'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              }
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Events refreshed'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
             },
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',

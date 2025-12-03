@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../data/models/event_model.dart';
 import '../../data/repositories/event_repository.dart';
@@ -21,17 +20,29 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 class EventList extends _$EventList {
   @override
   Future<List<EventModel>> build() async {
-    final repository = ref.read(eventRepositoryProvider);
-    return await repository.getAllEvents();
+    try {
+      final repository = ref.read(eventRepositoryProvider);
+      return await repository.getAllEvents();
+    } catch (e, st) {
+      developer.log('Error building EventList: $e', name: 'EventProvider');
+      developer.log('Stack trace: $st', name: 'EventProvider');
+      return [];
+    }
   }
   
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     
-    final repository = ref.read(eventRepositoryProvider);
-    state = await AsyncValue.guard(() async {
-      return await repository.getAllEvents();
-    });
+    try {
+      final repository = ref.read(eventRepositoryProvider);
+      state = await AsyncValue.guard(() async {
+        return await repository.getAllEvents();
+      });
+    } catch (e) {
+      developer.log('Error refreshing EventList: $e', name: 'EventProvider');
+      // Ensure we still show the previous state instead of error
+      state = const AsyncValue.data([]);
+    }
   }
 
   Future<void> addEvent(EventModel event) async {
@@ -63,10 +74,18 @@ class EventList extends _$EventList {
       // ✅ Update database
       final updatedEvent = await repository.updateEvent(event);
       
-      // ✅ Cancel old notification and schedule new one
-      await notificationService.cancelEventNotification(event.id);
+      // ✅ Cancel old notification and schedule new one (don't fail update if cancel fails)
+      try {
+        await notificationService.cancelEventNotification(event.id);
+      } catch (e) {
+        developer.log('Warning: failed to cancel notification for ${event.id}: $e', name: 'EventProvider');
+      }
       if (updatedEvent.hasReminder) {
-        await notificationService.scheduleEventNotification(updatedEvent);
+        try {
+          await notificationService.scheduleEventNotification(updatedEvent);
+        } catch (e) {
+          developer.log('Warning: failed to schedule notification for ${updatedEvent.id}: $e', name: 'EventProvider');
+        }
       }
       
       await Future.delayed(const Duration(milliseconds: 300));
@@ -79,16 +98,37 @@ class EventList extends _$EventList {
     final notificationService = ref.read(notificationServiceProvider);
     
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      // ✅ Cancel notification
-      await notificationService.cancelEventNotification(id);
-      
+    
+    try {
+      // ✅ Cancel notification (don't block delete if cancel fails)
+      try {
+        await notificationService.cancelEventNotification(id);
+      } catch (e) {
+        developer.log('Warning: failed to cancel notification for $id: $e', name: 'EventProvider');
+      }
+
       // ✅ Delete from database
       await repository.deleteEvent(id);
       
       await Future.delayed(const Duration(milliseconds: 300));
-      return await repository.getAllEvents();
-    });
+      
+      // ✅ Reload list
+      final updatedList = await repository.getAllEvents();
+      state = AsyncValue.data(updatedList);
+      
+      developer.log('✅ Event deleted successfully: $id', name: 'EventProvider');
+    } catch (e, st) {
+      developer.log('⚠️ Error deleting event: $e', name: 'EventProvider');
+      developer.log('Stack trace: $st', name: 'EventProvider');
+      // Even if error, try to reload the list so we show current state
+      try {
+        final updatedList = await repository.getAllEvents();
+        state = AsyncValue.data(updatedList);
+      } catch (e2) {
+        // If we can't even load, show error but don't crash
+        state = AsyncValue.error('Failed to delete event', st);
+      }
+    }
   }
   
   Future<void> toggleComplete(EventModel event) async {

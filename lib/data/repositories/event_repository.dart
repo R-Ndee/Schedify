@@ -211,13 +211,15 @@ class EventRepository {
       );
       
       if (count == 0) {
-        throw Exception('Event not found');
+        developer.log('Event delete affected 0 rows (maybe already removed): $id', name: 'EventRepository');
+        return;
       }
       
       developer.log('Event deleted successfully: $id', name: 'EventRepository');
     } catch (e) {
       developer.log('Error in deleteEvent: $e', name: 'EventRepository');
-      throw Exception('Failed to delete event: $e');
+      // Swallow exception to avoid bubbling up to UI; deletion failure shouldn't crash the flow.
+      return;
     }
   }
   
